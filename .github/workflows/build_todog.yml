@@ -1,0 +1,45 @@
+name: Build Godot Export Templates
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'build-*'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      # Make the key available to SCons
+      SCRIPT_AES256_ENCRYPTION_KEY: ${{ secrets.SCRIPT_AES256_ENCRYPTION_KEY }}
+    steps:
+      - name: Checkout Godot Source
+        uses: actions/checkout@v4
+        with:
+          repository: godotengine/todog
+          ref: 4.4.1-stable   # or the exact branch/tag you need
+
+      - name: Install Build Deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y scons pkg-config build-essential \
+             libx11-dev libxcursor-dev libxinerama-dev libgl1-mesa-dev \
+             libglu1-mesa-dev libasound2-dev libpulse-dev \
+             libudev-dev libxi-dev libxrandr-dev yasm
+
+      - name: Build Export Templates
+        run: |
+          scons platform=linuxbsd target=template_release tools=no -j$(nproc)
+          scons platform=windows target=template_release tools=no -j$(nproc)
+          scons platform=windows target=template_debug  tools=no -j$(nproc)
+
+      - name: Package
+        run: |
+          mkdir -p artifacts
+          cp bin/* artifacts/
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-export-templates
+          path: artifacts
